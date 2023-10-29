@@ -4,76 +4,88 @@
 
 `tinycrypto` provides a set of tools for encrypting and decrypting data. It is intentionally kept very minimal, to make it as simple as possible for developers, even without deep knowledge of cryptography.
 
-## Usage
+## Basic Usage
 
 The basic API is simple. 
 
-First, we need a 256-bit (32-byte) encryption key. This is our master secret that never appears anywhere in repo. It can be any 256-bit byte slice, but we provide an easy way to make one using a secret string.
+First, we need a 256-bit (32-byte) encryption key. `tinycrypto` provides two easy ways to make cryptographically secure encryption keys.
+
+We can generate one using any string:
 
 ```go
-encryptionKey := HashForString("super secret encryption key string")
+encryptionKey := tinycrypto.HashForString("super secret encryption key string")
 ```
 
-Alternatively, we could use a completely random 256-bit key.
+Or, we generate a completely random one:
 
 ```go
-encryptionKey, err := GenerateRandomBytes(32)
+encryptionKey, err := tinycrypto.GenerateRandomBytes(32)
 if err != nil {
     fmt.Println(err)
 }
 ```
 
-Once we have an encryption key, we can then use that value to encrypt and decrypt any slice of bytes.
+Now we can use our encryption key to encrypt and decrypt any slice of bytes:
 
 ```go
 secretToProtect := []byte("crown jewels")
-encrypted, err := Encrypt(secretToProtect, encryptionKey)
+encrypted, err := tinycrypto.Encrypt(secretToProtect, encryptionKey)
 if err != nil {
     fmt.Println(err)
 }
+
+// here we encode this base64 before printing
 fmt.Println(base64.RawStdEncoding.EncodeToString(encrypted))
 ```
 
-To get the original value back, we need to decrypt it using the same encryption key.
+To get the original value back, we decrypt it using the same encryption key:
 
 ```go
-recoveredSecret, err := Decrypt(encrypted, encryptionKey)
+recoveredSecret, err := tinycrypto.Decrypt(encrypted, encryptionKey)
 if err != nil {
     fmt.Println(err)
 }
 fmt.Println(string(recoveredSecret)) // crown jewels
 ```
 
-A second API, also intentionally minimalist, is based on using a `Keyset`. This is a container wrapping multiple `Key`s, to allow for the transparent rotation of encryption keys.
+## Keysets
 
-A `Key` wraps a 32-byte value used as an encryption key (as we saw above). Along with the value, it stores that `Key`'s creation and expiration timestamps (unix epoch).
+A second API, also intentionally minimalist, is based on using a `Keyset`. This is a container wrapping multiple `Key`s. This enables the simple, transparent rotation of encryption keys.
+
+A `Key` wraps one of those raw 32-byte encryption keys we made earlier. It augments the raw key with creation and expiration timestamps (unix epoch).
 
 ```go
 plaintext := []byte("this is my secret value that I must protect")
-key, err := NewRandomKey()
+
+// we’ll let it generate a complete random Key for us
+key, err := tinycrypto.NewRandomKey()
 if err != nil {
     fmt.Println(err)
 }
+
+// and add that to a new Keyset
 keyset := &Keyset{Keys: []*Key{key}}
+
+// now we can use the Keyset methods to encrypt and decrypt values
 cipherText, err := keyset.Encrypt(plaintext)
 if err != nil {
     fmt.Println(err)
 }
 ```
 
-Now let's say the want to start using a new key, but we still want to be able to
-access the values encrypted with the old key, up until a certain moment in time.
+Now, imagine that we want to start using a new `Key`, but for defined transition period, we still be able to access the values encrypted with the old key:
 
 ```go
 newKey, err := NewRandomKey()
 if err != nil {
     fmt.Println(err)
 }
-days90 := time.Hour * 24 * 90
-keyset.RotateIn(newKey,  days90)
+
+// the current key we’re replacing will expireAfter 30 days
+keyset.RotateIn(newKey, time.Hour * 24 * 30)
 ```
 
-From now on, anything that we encrypt with our keyset will be encrypted using the newKey. But we can also still decrypt our secret value, which was encrypted with the old key.
+From now on, anything that we encrypt with our `Keyset` will be encrypted using the newest `Key`. But we can also still decrypt secrets that were encrypted with any older key that hasn’t expired yet.
 
 ```go
 decrypted, err := keyset.Decrypt(cipherText)
@@ -83,10 +95,8 @@ if err != nil {
 fmt.Println(string(decrypted)) // this is my secret value that I must protect
 ```
 
-## Simple tip
+## One Approach
 
-When your application starts, pass in a "master secret". Hash the master secret to make it the a valid (master) encryption key. The master secret and master key are *NOT* stored in the application or backend, and are *NOT* used to encrypt secret values in your business domain. 
+When our service starts, we inject a "secret", and then immediately hash that secret to turn it into a valid encryption key, which we’ll call the `prime key`. We do **not** store the secret or the prime key in the code, or in the backend. And, we do **not** use the `prime key` to encrypt business. Instead, we generate a random key, our `working key`, that we use to encrypt and decrypt business values.
 
-But then what do we use to encrypt values in the business domain?
-
-Generate a new random encryption key. Let's call that the working encryption key. Encrypt secret values in your business domain with that working encryption key. Now, you'll need to persist that working encryption key so that it can be used across multiple instances or multiple sessions. This is where you use the master encryption key. Encrypt the working encryption key with the master encryption key, and only then share the (encrypted) working encryption key among instances or save it to a persistent store.
+Now, we need to store the `working key` in a configuration service or a data store, to make it available across sessions and across different instances of our service. We use the `prime key` to encrypt the `working key` before persisting it, and to decrypt it when an instance starts up. This which ensures that our `prime key` was never stored anywhere, and minimizes its presence in memory.
