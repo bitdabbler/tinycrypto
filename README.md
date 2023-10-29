@@ -7,7 +7,7 @@
 ```go
 import (
     // …
-    “github.com/bitdabbler/tinycrypto”
+    "github.com/bitdabbler/tinycrypto"
 ) 
 ```
 
