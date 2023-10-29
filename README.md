@@ -13,6 +13,13 @@ First, we need a 256-bit (32-byte) encryption key. `tinycrypto` provides two eas
 We can generate one using any string:
 
 ```go
+import (
+    // …
+    “github.com/bitdabbler/tinycrypto”
+) 
+```
+
+```go
 encryptionKey := tinycrypto.HashForString("super secret encryption key string")
 ```
 
