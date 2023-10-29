@@ -4,6 +4,13 @@
 
 `tinycrypto` provides a set of tools for encrypting and decrypting data. It is intentionally kept very minimal, to make it as simple as possible for developers, even without deep knowledge of cryptography.
 
+```go
+import (
+    // …
+    “github.com/bitdabbler/tinycrypto”
+) 
+```
+
 ## Basic Usage
 
 The basic API is simple. 
@@ -11,13 +18,6 @@ The basic API is simple.
 First, we need a 256-bit (32-byte) encryption key. `tinycrypto` provides two easy ways to make cryptographically secure encryption keys.
 
 We can generate one using any string:
-
-```go
-import (
-    // …
-    “github.com/bitdabbler/tinycrypto”
-) 
-```
 
 ```go
 encryptionKey := tinycrypto.HashForString("super secret encryption key string")
