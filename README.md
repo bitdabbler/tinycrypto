@@ -80,7 +80,7 @@ if err != nil {
 }
 ```
 
-Now, imagine that we want to start using a new `Key`, but for defined transition period, we still be able to access the values encrypted with the old key:
+Now, imagine that we want to start using a new `Key`, but for defined transition period, still be able to access the values encrypted with the old key:
 
 ```go
 newKey, err := NewRandomKey()
@@ -95,6 +95,7 @@ keyset.RotateIn(newKey, time.Hour * 24 * 30)
 From now on, anything that we encrypt with our `Keyset` will be encrypted using the newest `Key`. But we can also still decrypt secrets that were encrypted with any older key that hasn’t expired yet.
 
 ```go
+// cipherText was encrypted using the previous key
 decrypted, err := keyset.Decrypt(cipherText)
 if err != nil {
     fmt.Println(err)
@@ -104,6 +105,6 @@ fmt.Println(string(decrypted)) // this is my secret value that I must protect
 
 ## One Approach
 
-When our service starts, we inject a "secret", and then immediately hash that secret to turn it into a valid encryption key, which we’ll call the `prime key`. We do **not** store the secret or the prime key in the code, or in the backend. And, we do **not** use the `prime key` to encrypt business. Instead, we generate a random key, our `working key`, that we use to encrypt and decrypt business values.
+When our service starts, we inject a "secret", and then immediately hash that secret to turn it into a valid encryption key, which we’ll call the `prime key`. We do **not** store the secret or the prime key in the code, or in the backend. And, we do **not** use the `prime key` to encrypt business values. Instead, we generate a random key, our `working key`, that we use to encrypt and decrypt business values.
 
 Now, we need to store the `working key` in a configuration service or a data store, to make it available across sessions and across different instances of our service. We use the `prime key` to encrypt the `working key` before persisting it, and to decrypt it when an instance starts up. This which ensures that our `prime key` was never stored anywhere, and minimizes its presence in memory.
